@@ -71,6 +71,9 @@ class RESPCodec:
         elif isinstance(value, bytes):
             return f"${len(value)}\r\n".encode("utf-8") + value + b"\r\n"
 
+        elif isinstance(value, Exception):
+            return f"-{str(value)}\r\n".encode("utf-8")
+
         else:
             raise TypeError(f"Unsupported type: {type(value)}")
 
