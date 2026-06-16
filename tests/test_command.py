@@ -1,3 +1,4 @@
+import os
 import time
 import unittest
 
@@ -273,6 +274,15 @@ class TestCommandHandler(unittest.TestCase):
         self.assertIsInstance(result, Exception)
         self.assertIn("wrong number of arguments", str(result).lower())
 
+    def test_save_and_load_roundtrip(self):
+        self.handler.handle(["SET", "persist_key", "persist_val"])
+        result = self.handler.handle(["SAVE"])
+        self.assertEqual(result, "OK")
+
+        store2 = Storage()
+        store2.load_from_file()
+        self.assertEqual(store2.get("persist_key"), "persist_val")
+
     def test_full_integration(self):
         self.assertEqual(self.handler.handle(["PING"]), "PONG")
         self.assertEqual(self.handler.handle(["SET", "key1", "val1"]), "OK")
@@ -283,6 +293,16 @@ class TestCommandHandler(unittest.TestCase):
         self.assertEqual(self.handler.handle(["EXISTS", "key1"]), 0)
         self.assertEqual(self.handler.handle(["EXPIRE", "key2", "100"]), 1)
         self.assertGreater(self.handler.handle(["TTL", "key2"]), 0)
+
+
+def setUpModule():
+    global _orig_exists
+    _orig_exists = os.path.exists
+
+
+def tearDownModule():
+    if os.path.exists("dump.json"):
+        os.remove("dump.json")
 
 
 if __name__ == "__main__":

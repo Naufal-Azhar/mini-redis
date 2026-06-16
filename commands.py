@@ -31,6 +31,7 @@ class CommandHandler:
             "EXISTS": self.exists,
             "EXPIRE": self.expire,
             "TTL": self.ttl,
+            "SAVE": self.save,
         }
 
         if cmd_name in methods:
@@ -95,6 +96,10 @@ class CommandHandler:
             self.storage.delete(key)
             return -2
         return sisa
+
+    def save(self) -> str:
+        self.storage.save_to_file()
+        return "OK"
 
 
 # --- CONTOH PENGGUNAAN ---

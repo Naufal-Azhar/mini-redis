@@ -1,16 +1,15 @@
+import json
+import os
+import threading
 import time
 
 
 class Storage:
     def __init__(self):
-        # Struktur data: { key: {"value": any, "expires_at": float atau None} }
         self._kv_store = {}
+        self._lock = threading.Lock()
 
     def set(self, key: str, value: any, ttl: int = None) -> str:
-        """
-        Menyimpan data dengan key dan value.
-        Jika ttl (Time To Live) diisi (dalam satuan detik), hitung waktu kedaluwarsanya.
-        """
         expires_at = None
         if ttl is not None:
             expires_at = time.time() + ttl
@@ -19,70 +18,84 @@ class Storage:
         return "OK"
 
     def get(self, key: str) -> any:
-        """
-        Mengambil data berdasarkan key.
-        Jika key sudah kedaluwarsa, hapus dari memori dan kembalikan None.
-        """
         if key not in self._kv_store:
             return None
 
         data = self._kv_store[key]
         expires_at = data["expires_at"]
 
-        # Cek apakah sudah kedaluwarsa (Lazy Expiration)
         if expires_at is not None and time.time() > expires_at:
-            self.delete(key)  # Hapus secara pasif untuk menghemat memori
+            self.delete(key)
             return None
 
         return data["value"]
 
     def delete(self, key: str) -> int:
-        """
-        Menghapus key dari storage.
-        Mengembalikan 1 jika key berhasil dihapus, atau 0 jika key tidak ditemukan.
-        """
         if key in self._kv_store:
             del self._kv_store[key]
             return 1
         return 0
 
     def exists(self, key: str) -> int:
-        """
-        Memeriksa apakah suatu key ada dan belum kedaluwarsa.
-        Mengembalikan 1 jika ada, 0 jika tidak ada.
-        """
-        # Kita panggil get(key) untuk memanfaatkan pengecekan expiry otomatis di atas
         if self.get(key) is not None:
             return 1
         return 0
 
     def get_expiry(self, key: str) -> float | None:
-            if key not in self._kv_store:
-                return None
-            return self._kv_store[key]["expires_at"]
+        if key not in self._kv_store:
+            return None
+        return self._kv_store[key]["expires_at"]
+
+    def save_to_file(self, filepath="dump.json"):
+        with self._lock:
+            try:
+                with open(filepath, "w") as f:
+                    json.dump(self._kv_store, f, indent=4)
+                print(f"[RDB] Snapshot saved to {filepath}")
+                return True
+            except Exception as e:
+                print(f"[RDB Error] Failed to save: {e}")
+                return False
+
+    def load_from_file(self, filepath="dump.json"):
+        if not os.path.exists(filepath):
+            return False
+
+        with self._lock:
+            try:
+                with open(filepath, "r") as f:
+                    raw_data = json.load(f)
+
+                now = time.time()
+                self._kv_store = {
+                    k: v
+                    for k, v in raw_data.items()
+                    if v["expires_at"] is None or v["expires_at"] > now
+                }
+                print(f"[RDB] Loaded {len(self._kv_store)} keys from {filepath}")
+                return True
+            except Exception as e:
+                print(f"[RDB Error] Failed to load: {e}")
+                return False
 
 
-# --- CONTOH PENGGUNAAN ---
 if __name__ == "__main__":
     db = Storage()
 
-    print("--- Uji Coba SET dan GET biasa ---")
-    print(db.set("nama", "Gemini"))  # OK
-    print(db.get("nama"))  # Gemini
+    print("--- SET & GET ---")
+    print(db.set("nama", "Gemini"))
+    print(db.get("nama"))
 
-    print("\n--- Uji Coba EXISTS dan DELETE ---")
-    print(db.exists("nama"))  # 1
-    print(db.delete("nama"))  # 1
-    print(db.get("nama"))  # None
-    print(db.exists("nama"))  # 0
+    print("\n--- EXISTS & DELETE ---")
+    print(db.exists("nama"))
+    print(db.delete("nama"))
+    print(db.get("nama"))
+    print(db.exists("nama"))
 
-    print("\n--- Uji Coba EXPIRE (TTL: 2 detik) ---")
+    print("\n--- EXPIRE (TTL: 2 detik) ---")
     db.set("session_token", "ABC123XYZ", ttl=2)
-    print("Langsung ambil:", db.get("session_token"))  # ABC123XYZ
+    print("Ambil:", db.get("session_token"))
 
     print("Tunggu 2.5 detik...")
     time.sleep(2.5)
-
-    print(
-        "Ambil setelah delay:", db.get("session_token")
-    )  # None (Sudah terhapus otomatis)
+    print("Ambil setelah delay:", db.get("session_token"))
