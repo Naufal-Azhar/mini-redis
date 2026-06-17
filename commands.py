@@ -5,22 +5,25 @@ from storage import Storage
 
 class CommandHandler:
     def __init__(self, storage: Storage):
-        """
-        Menerima instance dari Storage sebagai dependency injection.
-        """
         self.storage = storage
 
-    def handle(self, cmd_args: list) -> any:
-        """
-        Method utama untuk me-route/mengarahkan argumen dari client
-        ke fungsi yang tepat secara dinamis.
-        """
+        # state baru untuk menampung pubsub
+        self.channels = {}
+
+    def handle(self, cmd_args: list, client_socket=None) -> any:
         if not cmd_args:
             return Exception("ERR empty command")
 
-        # Ambil command utama (misal: "GET", "SET") dan jadikan uppercase
         cmd_name = str(cmd_args[0]).upper()
         args = cmd_args[1:]
+
+        # Intersepsi khusus untuk SUBSCRIBE karena butuh object client_socket
+        if cmd_name == "SUBSCRIBE":
+            if not args:
+                return Exception(
+                    "ERR wrong number of arguments fot 'subscribe' command"
+                )
+            return self.subscribe(client_socket, *args)
 
         # Mapping string command ke method di class ini
         methods = {
@@ -32,6 +35,7 @@ class CommandHandler:
             "EXPIRE": self.expire,
             "TTL": self.ttl,
             "SAVE": self.save,
+            "PUBLISH": self.publish,
         }
 
         if cmd_name in methods:
@@ -44,6 +48,51 @@ class CommandHandler:
                 )
         else:
             return Exception(f"ERR unknown command '{cmd_name.lower()}'")
+
+    def subscribe(self, client_socket,  *channel_names):
+        responses = []
+        for channel in channel_names:
+            if channel not in self.channels:
+                self.channels[channel] = set()
+
+                self.channels[channel].add(client_socket)
+                count = len(self.channels[channel])
+
+                # karena client bisa subscribe ke banyak channel sekaligus, kita return per-channel
+                responses.append(["subscribe", channel, count])
+
+        # kembalikan sebagai list nested agar nanti di-encode jadi array oleh server
+        return responses
+
+    # === LOGIKA BARU: PUBLISH ===
+    def publish(self, channel: str, message: str) -> int:
+        if channel not in self.channels or not self.channels[channel]:
+            return 0
+
+        pubsub_msg = ["message", channel, message]
+        encode_msg = RESPCodec.encode(pubsub_msg)
+
+        subscribers_dead = []
+        for sock in self.channels[channel]:
+            try:
+                sock.sendall(encode_msg)
+            except Exception:
+                subscribers_dead.append(sock)
+
+            for dead_sock in subscribers_dead:
+                self.unsubscribe_client(dead_sock)
+
+            return len(self.channels[channel]) - len(subscribers_dead)
+
+    # === LOGIKA BARU: CLEANUP DISCONNECT ===
+    def unsubscribe_client(self, client_socket):
+        for channel, subscribers in list(self.channels.items()):
+            if client_socket in subscribers:
+                subscribers.remove(client_socket)
+
+            # ini opsional : hapus nama dari dict kalau udah ga ada subscribers sama sekali
+            if not subscribers:
+                del self.channels[channel]
 
     def ping(self, *args) -> str:
         # PING bisa menerima argumen opsional (misal: PING "halo" -> return "halo")

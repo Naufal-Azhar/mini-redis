@@ -81,7 +81,7 @@ class MiniRedisServer:
 
                 self.client_buffers[client_socket] = remainder
 
-                raw_response = self.handler.handle(cmd_args)
+                raw_response = self.handler.handle(cmd_args, client_socket)
 
                 encoded_response = RESPCodec.encode(raw_response)
 
@@ -95,6 +95,10 @@ class MiniRedisServer:
 
     def close_connection(self, client_socket):
         print("Client disconnected.")
+
+        # fitur untuk unsubscribe client dari channel yang sedang subscribe
+        self.handler.unsubscribe_client(client_socket)
+
         if client_socket in self.client_buffers:
             del self.client_buffers[client_socket]
         self.selector.unregister(client_socket)
