@@ -1,5 +1,6 @@
 import time
 
+from protocol import RESPCodec
 from storage import Storage
 
 
@@ -55,11 +56,11 @@ class CommandHandler:
             if channel not in self.channels:
                 self.channels[channel] = set()
 
-                self.channels[channel].add(client_socket)
-                count = len(self.channels[channel])
+            self.channels[channel].add(client_socket)
+            count = len(self.channels[channel])
 
-                # karena client bisa subscribe ke banyak channel sekaligus, kita return per-channel
-                responses.append(["subscribe", channel, count])
+            # karena client bisa subscribe ke banyak channel sekaligus, kita return per-channel
+            responses.append(["subscribe", channel, count])
 
         # kembalikan sebagai list nested agar nanti di-encode jadi array oleh server
         return responses
@@ -79,10 +80,10 @@ class CommandHandler:
             except Exception:
                 subscribers_dead.append(sock)
 
-            for dead_sock in subscribers_dead:
-                self.unsubscribe_client(dead_sock)
+        for dead_sock in subscribers_dead:
+            self.unsubscribe_client(dead_sock)
 
-            return len(self.channels[channel]) - len(subscribers_dead)
+        return len(self.channels[channel]) - len(subscribers_dead)
 
     # === LOGIKA BARU: CLEANUP DISCONNECT ===
     def unsubscribe_client(self, client_socket):
