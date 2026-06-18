@@ -1,0 +1,22 @@
+{
+    "counter": {
+        "value": "2",
+        "expires_at": null
+    },
+    "pesan": {
+        "value": "Halo Har",
+        "expires_at": null
+    },
+    "a": {
+        "value": "10",
+        "expires_at": null
+    },
+    "b": {
+        "value": "20",
+        "expires_at": null
+    },
+    "c": {
+        "value": "30",
+        "expires_at": null
+    }
+}

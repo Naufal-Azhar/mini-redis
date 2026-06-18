@@ -8,49 +8,43 @@ import fnmatch
 class Storage:
 
     def incr(self, key: str) -> int:
-            """Menaikkan nilai integer dari key sebanyak 1."""
-            current_val = self.get(key)
+        current_val = self.get(key)
 
-            if current_val is None:
-                new_val = 1
-            else:
-                try:
-                    # Redis menyimpan semuanya sebagai string/bulk, tapi bisa di-incr kalau berupa angka
-                    new_val = int(current_val) + 1
-                except (ValueError, TypeError):
-                    raise Exception("ERR value is not an integer or out of range")
+        if current_val is None:
+            new_val = 1
+        else:
+            try:
+                new_val = int(current_val) + 1
+            except (ValueError, TypeError):
+                raise Exception("ERR value is not an integer or out of range")
 
-            # Simpan kembali nilai baru (tetap pertahankan TTL lama jika ada, atau reset sesuai kebutuhan)
-            self.set(key, str(new_val))
-            return new_val
+        self.set(key, str(new_val))
+        return new_val
 
-        def append(self, key: str, value: str) -> int:
-            """Menambahkan string ke akhir nilai key. Mengembalikan panjang string baru."""
-            current_val = self.get(key)
+    def append(self, key: str, value: str) -> int:
+        current_val = self.get(key)
 
-            if current_val is None:
-                new_val = value
-            else:
-                new_val = str(current_val) + value
+        if current_val is None:
+            new_val = value
+        else:
+            new_val = str(current_val) + value
 
-            self.set(key, new_val)
-            return len(new_val)
+        self.set(key, new_val)
+        return len(new_val)
 
-        def get_all_keys(self, pattern: str) -> list:
-            """Mencari key yang cocok dengan pattern menggunakan fnmatch."""
-            matched_keys = []
-            now = time.time()
+    def get_all_keys(self, pattern: str) -> list:
+        matched_keys = []
+        now = time.time()
 
-            # Kita filter langsung key yang udah expired biar gak ikutan muncul
-       for k, v in list(self._kv_store.items()):
+        for k, v in list(self._kv_store.items()):
             if v["expires_at"] is not None and now > v["expires_at"]:
-               del self._kv_store[k]
-                 continue
+                del self._kv_store[k]
+                continue
 
-       if fnmatch.fnmatch(k, pattern):
-          matched_keys.append(k)
+            if fnmatch.fnmatch(k, pattern):
+                matched_keys.append(k)
 
-    return matched_keys
+        return matched_keys
 
     def __init__(self):
         self._kv_store = {}

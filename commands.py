@@ -55,34 +55,30 @@ class CommandHandler:
         else:
             return Exception(f"ERR unknown command '{cmd_name.lower()}'")
 
-     # === IMPLEMENTASI EXTENDED COMMANDS ===
+    # === IMPLEMENTASI EXTENDED COMMANDS ===
 
     def incr(self, key: str):
-            try:
-                return self.storage.incr(key)
-            except Exception as e:
-                return e
+        try:
+            return self.storage.incr(key)
+        except Exception as e:
+            return e
 
-        def append(self, key: str, value: str):
-            return self.storage.append(key, value)
+    def append(self, key: str, value: str):
+        return self.storage.append(key, value)
 
-        def mset(self, *args) -> str:
-            # MSET syntax harus berpasangan: MSET key1 val1 key2 val2
-            if len(args) % 2 != 0:
-                return Exception("ERR wrong number of arguments for 'mset' command")
+    def mset(self, *args) -> str:
+        if len(args) % 2 != 0:
+            return Exception("ERR wrong number of arguments for 'mset' command")
 
-            # Loop lompat 2 langkah untuk ambil pasangan key dan value
-            for i in range(0, len(args), 2):
-                self.storage.set(args[i], args[i+1])
-            return "OK"
+        for i in range(0, len(args), 2):
+            self.storage.set(args[i], args[i+1])
+        return "OK"
 
-        def mget(self, *keys) -> list:
-            # Mengembalikan list value dari banyak key sekaligus
-            return [self.storage.get(key) for key in keys]
+    def mget(self, *keys) -> list:
+        return [self.storage.get(key) for key in keys]
 
-        def keys(self, pattern: str) -> list:
-            # Mendukung pencarian key (contoh: KEYS *)
-            return self.storage.get_all_keys(pattern)
+    def keys(self, pattern: str) -> list:
+        return self.storage.get_all_keys(pattern)
 
 
     def subscribe(self, client_socket,  *channel_names):
